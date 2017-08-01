@@ -190,6 +190,8 @@ class RN(nn.Module):
         # objects | 25 x 64 x 37
 
         inv_idx = Variable(torch.arange(objects.size(0)-1, -1, -1).long())
+        if cuda_exist:
+            inv_idx = inv_idx.cuda()
         inv_objects = objects.index_select(0, inv_idx)
         # inv_objects = objects[inv_idx]
 
