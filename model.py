@@ -7,6 +7,8 @@ from torch.autograd import Variable
 import torch.nn.init as init
 
 
+cuda_exist = torch.cuda.is_available()
+
 class MemoryCell(nn.Module):
     def __init__(self, num_mem_slots, embed_dim):
         super(MemoryCell, self).__init__()
@@ -79,7 +81,10 @@ class RecurrentEntityNetwork(nn.Module):
         # Compute memory updates.
 
         keys = torch.arange(0, self.num_mem_slots)
-        keys = torch.autograd.Variable(keys.unsqueeze(0).expand(bsize, self.num_mem_slots).long())
+        rem1 = keys.unsqueeze(0).expand(bsize, self.num_mem_slots).long()
+        if cuda_exist: 
+            rem1 = rem1.cuda()
+        keys = torch.autograd.Variable(rem1)
 
         keys = self.embedding(keys).view(bsize * self.num_mem_slots, -1)
 
@@ -139,7 +144,8 @@ class RN(nn.Module):
         num_classes = 10
         num_mem_slots = 20
         self.mnet = RecurrentEntityNetwork(hidden_dim, dim_obj_qst, num_classes, num_mem_slots)
-        self.mnet.cuda()
+        if cuda_exist:
+            self.mnet.cuda()
 
         self.H = nn.Linear(2 * num_mem_slots * hidden_dim, hidden_dim)
         self.Z = nn.Linear(hidden_dim, num_classes)
