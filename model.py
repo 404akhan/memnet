@@ -139,7 +139,8 @@ class RN(nn.Module):
         num_classes = 10
         num_mem_slots = 20
         self.mnet = RecurrentEntityNetwork(hidden_dim, dim_obj_qst, num_classes, num_mem_slots)
-        
+        self.mnet.cuda()
+
         self.H = nn.Linear(2 * num_mem_slots * hidden_dim, hidden_dim)
         self.Z = nn.Linear(hidden_dim, num_classes)
         init.xavier_normal(self.H.weight)
