@@ -169,7 +169,7 @@ class RN(nn.Module):
         if cuda_exist:
             self.mnet.cuda()
 
-        self.H = nn.Linear(2 * num_mem_slots * hidden_dim, hidden_dim)
+        self.H = nn.Linear(2 * hidden_dim, hidden_dim)
         self.Z = nn.Linear(hidden_dim, num_classes)
         init.xavier_normal(self.H.weight)
         init.xavier_normal(self.Z.weight)
