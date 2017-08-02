@@ -58,7 +58,7 @@ class MemoryCell(nn.Module):
 
 
 class RecurrentEntityNetwork(nn.Module):
-    def __init__(self, hidden_dim, dim_obj_qst=37, num_classes=10, num_mem_slots=20, qst_dim=11):
+    def __init__(self, hidden_dim, dim_obj_qst=37, num_classes=10, num_mem_slots=10, qst_dim=11):
         super(RecurrentEntityNetwork, self).__init__()
 
         self.embed_dim = hidden_dim
@@ -164,7 +164,7 @@ class RN(nn.Module):
         hidden_dim = 100
         dim_obj_qst = 37
         num_classes = 10
-        num_mem_slots = 20
+        num_mem_slots = 10
         self.mnet = RecurrentEntityNetwork(hidden_dim, dim_obj_qst, num_classes, num_mem_slots)
         if cuda_exist:
             self.mnet.cuda()
