@@ -45,7 +45,7 @@ class MemoryCell(nn.Module):
             memory_gates = memory_gates.expand_as(memories)
 
             join = torch.cat([self.U(memories), self.V(sentence), self.W(keys)], dim=1)
-            join = self.J(F.tanh(join))
+            join = self.J(F.relu(join))
             candidate_memories = self.prelu_memory(join)
 
             updated_memories = memories + memory_gates * candidate_memories
@@ -58,7 +58,7 @@ class MemoryCell(nn.Module):
 
 
 class RecurrentEntityNetwork(nn.Module):
-    def __init__(self, hidden_dim, dim_obj_qst=37, num_classes=10, num_mem_slots=20):
+    def __init__(self, hidden_dim, dim_obj_qst=37, num_classes=10, num_mem_slots=20, qst_dim=11):
         super(RecurrentEntityNetwork, self).__init__()
 
         self.embed_dim = hidden_dim
@@ -71,17 +71,23 @@ class RecurrentEntityNetwork(nn.Module):
 
         # Fully connected linear layers
         self.C = nn.Linear(dim_obj_qst, hidden_dim)
+        self.H = nn.Linear(2 * hidden_dim, hidden_dim)
+        self.Q = nn.Linear(qst_dim, hidden_dim)
 
         # Initialize weights.
         init.xavier_normal(self.C.weight)
+        init.xavier_normal(self.H.weight)
+        init.xavier_normal(self.Q.weight)
 
-    def forward(self, memory_inputs):
+    def forward(self, memory_inputs, question_inputs):
         # memory_inputs | seq_len x bsize x dim_obj_qst
+        # question_inputs | bsize x qst_dim
 
         seq_len, bsize, dim_obj_qst = memory_inputs.size()
         memory_inputs = self.C(memory_inputs.view(seq_len * bsize, -1))
         memory_inputs = F.relu(memory_inputs).view(seq_len, bsize, -1) # check relu performance on top of this
-
+        question_inputs = F.relu(self.Q(question_inputs))
+        
         # Compute memory updates.
 
         keys = torch.arange(0, self.num_mem_slots)
@@ -93,10 +99,22 @@ class RecurrentEntityNetwork(nn.Module):
         keys = self.embedding(keys).view(bsize * self.num_mem_slots, -1)
 
         network_graph = self.cell(memory_inputs, keys)
-        network_graph = network_graph.view(bsize, self.num_mem_slots * self.embed_dim)
+        network_graph = network_graph.view(bsize, self.num_mem_slots, self.embed_dim)
 
-        # logits, bsize x num_classes, change to log_softmax
-        return network_graph
+        # Apply attention to the entire acyclic graph using the questions.
+
+        attention_energies = network_graph * question_inputs.unsqueeze(1).expand_as(network_graph)
+        attention_energies = attention_energies.sum(dim=-1)
+
+        attention_weights = F.softmax(attention_energies).expand_as(network_graph)
+
+        attended_network_graph = (network_graph * attention_weights).sum(dim=1).squeeze()
+
+        # Condition the fully-connected layer using the questions.
+
+        outputs = F.relu(self.H(torch.cat([question_inputs, attended_network_graph], dim=1)))
+
+        return outputs
 
 
 class RN(nn.Module):
@@ -164,6 +182,7 @@ class RN(nn.Module):
     def forward(self, img, qst):
         # img | 64 x 3 x 75 x 75
         # qst | 64 x 11
+        qst_rem = qst
         """convolution"""
         x = self.conv1(img)
         x = F.relu(x)
@@ -199,8 +218,8 @@ class RN(nn.Module):
         inv_objects = objects.index_select(0, inv_idx)
         # inv_objects = objects[inv_idx]
 
-        outputs1 = self.mnet(objects)
-        outputs2 = self.mnet(inv_objects)
+        outputs1 = self.mnet(objects, qst_rem)
+        outputs2 = self.mnet(inv_objects, qst_rem)
         
         out_concat = torch.cat([outputs1, outputs2], 1)
 
