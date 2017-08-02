@@ -7,11 +7,6 @@ from torch.autograd import Variable
 import torch.nn.init as init
 
 
-def selu(x):
-    alpha = 1.6732632423543772848170429916717
-    scale = 1.0507009873554804934193349852946
-    return scale * F.elu(x, alpha)
-
 cuda_exist = torch.cuda.is_available()
 
 class MemoryCell(nn.Module):
@@ -32,6 +27,7 @@ class MemoryCell(nn.Module):
         init.xavier_normal(self.U.weight)
         init.xavier_normal(self.V.weight)
         init.xavier_normal(self.W.weight)
+        init.xavier_normal(self.J.weight)
 
     def forward(self, inputs, keys):
         # inputs    | seq_len x bsize x hid_dim
@@ -50,7 +46,7 @@ class MemoryCell(nn.Module):
             memory_gates = memory_gates.expand_as(memories)
 
             join = torch.cat([self.U(memories), self.V(sentence), self.W(keys)], dim=1)
-            join = self.J(selu(join))
+            join = self.J(F.relu(join))
             candidate_memories = self.prelu_memory(join)
 
             updated_memories = memories + memory_gates * candidate_memories
@@ -90,8 +86,8 @@ class RecurrentEntityNetwork(nn.Module):
 
         seq_len, bsize, dim_obj_qst = memory_inputs.size()
         memory_inputs = self.C(memory_inputs.view(seq_len * bsize, -1))
-        memory_inputs = selu(memory_inputs).view(seq_len, bsize, -1) # check relu performance on top of this
-        question_inputs = selu(self.Q(question_inputs))
+        memory_inputs = F.relu(memory_inputs).view(seq_len, bsize, -1) # check relu performance on top of this
+        question_inputs = F.relu(self.Q(question_inputs))
         
         # Compute memory updates.
 
@@ -117,7 +113,7 @@ class RecurrentEntityNetwork(nn.Module):
 
         # Condition the fully-connected layer using the questions.
 
-        outputs = selu(self.H(torch.cat([question_inputs, attended_network_graph], dim=1)))
+        outputs = F.relu(self.H(torch.cat([question_inputs, attended_network_graph], dim=1)))
 
         return outputs
 
@@ -228,7 +224,7 @@ class RN(nn.Module):
         
         out_concat = torch.cat([outputs1, outputs2], 1)
 
-        logits = selu(self.H(out_concat))
+        logits = F.relu(self.H(out_concat))
         logits = self.Z(logits)
 
         return F.log_softmax(logits)
