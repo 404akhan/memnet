@@ -90,8 +90,8 @@ class RecurrentEntityNetwork(nn.Module):
 
         seq_len, bsize, dim_obj_qst = memory_inputs.size()
         memory_inputs = self.C(memory_inputs.view(seq_len * bsize, -1))
-        memory_inputs = F.relu(memory_inputs).view(seq_len, bsize, -1) # check relu performance on top of this
-        question_inputs = F.relu(self.Q(question_inputs))
+        memory_inputs = selu(memory_inputs).view(seq_len, bsize, -1) # check relu performance on top of this
+        question_inputs = selu(self.Q(question_inputs))
         
         # Compute memory updates.
 
