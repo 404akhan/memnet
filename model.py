@@ -18,8 +18,9 @@ class MemoryCell(nn.Module):
 
         # Memory update linear layers.
         self.U = nn.Linear(embed_dim, embed_dim)
-        self.V = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.V = nn.Linear(embed_dim, embed_dim)
+        self.W = nn.Linear(embed_dim, embed_dim)
+        self.J = nn.Linear(3 * embed_dim, embed_dim)
 
         self.prelu_memory = nn.PReLU(init=1)
 
@@ -43,7 +44,9 @@ class MemoryCell(nn.Module):
             memory_gates = F.sigmoid((sentence * (memories + keys)).sum(dim=-1))
             memory_gates = memory_gates.expand_as(memories)
 
-            candidate_memories = self.prelu_memory(self.U(memories) + self.V(sentence) + self.W(keys))
+            join = torch.cat([self.U(memories), self.V(sentence), self.W(keys)], dim=1)
+            join = self.J(F.tanh(join))
+            candidate_memories = self.prelu_memory(join)
 
             updated_memories = memories + memory_gates * candidate_memories
             updated_memories = updated_memories / (
